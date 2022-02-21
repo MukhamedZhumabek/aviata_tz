@@ -1,0 +1,64 @@
+version: '3.3'
+
+services:
+
+  db:
+    image: library/postgres:11-alpine
+    restart: always
+    env_file:
+      - ./airflow/.env
+    ports:
+      - "5423:5432"
+    volumes:
+     - airflow_db_data:/var/lib/postgresql/data
+
+  alembic:
+    build: ./airflow
+    env_file:
+      - ./airflow/.env
+    volumes:
+      - ./airflow/settings.py:/server/settings.py
+      - ./airflow/alembic.ini:/server/alembic.ini
+    command: sh -c "alembic upgrade heads"
+    restart: on-failure
+    depends_on:
+      - db
+
+  airflow:
+    build: ./airflow
+    restart: always
+    volumes:
+    - ./airflow/settings.py:/server/settings.py
+    - ./airflow/templates:/server/templates
+    env_file:
+      - ./airflow/.env
+    ports:
+    - "9000:8080"
+    command: sh -c "python3 /server/run.py airflow"
+    depends_on:
+      - db
+
+  provider-a:
+    build: ./provider_a
+    restart: always
+    volumes:
+    - ./provider_a/templates:/server/templates
+    ports:
+    - "8081:8081"
+    command: sh -c "python3 /server/run.py"
+    depends_on:
+      - airflow
+
+  provider-b:
+    build: ./provider_b
+    restart: always
+    volumes:
+    - ./provider_b/templates:/server/templates
+    ports:
+    - "8082:8082"
+    command: sh -c "python3 /server/run.py"
+    depends_on:
+      - airflow
+
+volumes:
+  airflow_db_data: {}
